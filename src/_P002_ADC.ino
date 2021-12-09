@@ -23,6 +23,7 @@
 
 
 #define P002_OVERSAMPLING        PCONFIG(0)
+#define P002_DELTA        PCONFIG(1)
 #define P002_CALIBRATION_ENABLED PCONFIG(3)
 #define P002_CALIBRATION_POINT1  PCONFIG_LONG(0)
 #define P002_CALIBRATION_POINT2  PCONFIG_LONG(1)
@@ -41,6 +42,10 @@ struct P002_data_struct : public PluginTaskData_base {
     OversamplingCount  = 0;
     OversamplingMinVal = P002_MAX_ADC_VALUE;
     OversamplingMaxVal = -P002_MAX_ADC_VALUE;
+    
+    DeltaCount  = 0;
+    DeltaMinVal = P002_MAX_ADC_VALUE;
+    DeltaMaxVal = -P002_MAX_ADC_VALUE;
   }
 
   void addOversamplingValue(int currentValue) {
@@ -83,13 +88,50 @@ struct P002_data_struct : public PluginTaskData_base {
     return false;
   }
 
+  void addDeltaValue(int currentValue) {
+    // Extra check to only add min or max readings once.
+    // They will be taken out of the averaging only one time.
+    if ((currentValue == 0) && (currentValue == OversamplingMinVal)) {
+      return;
+    }
+
+    if ((currentValue == P002_MAX_ADC_VALUE) && (currentValue == OversamplingMaxVal)) {
+      return;
+    }
+
+    // OversamplingValue += currentValue;
+    ++DeltaCount;
+
+    if (currentValue > DeltaMaxVal) {
+      DeltaMaxVal= currentValue;
+    }
+
+    if (currentValue < DeltaMinVal) {
+      DeltaMinVal = currentValue;
+    }
+  }
+
+  bool getDeltaValue(float& float_value, int& raw_value) {
+    if (DeltaCount > 1) {
+      float_value = DeltaMaxVal - DeltaMinVal;
+      raw_value   = static_cast<int16_t>(float_value);
+      return true;
+    }
+    return false;
+  }
+
   uint16_t OversamplingCount = 0;
+  uint16_t DeltaCount = 0;
+ int32_t DeltaValue  = 0;
+  int16_t DeltaMinVal = P002_MAX_ADC_VALUE;
+  int16_t DeltaMaxVal = 0;
 
 private:
 
   int32_t OversamplingValue  = 0;
   int16_t OversamplingMinVal = P002_MAX_ADC_VALUE;
   int16_t OversamplingMaxVal = 0;
+ 
 };
 
 boolean Plugin_002(uint8_t function, struct EventStruct *event, String& string)
@@ -135,6 +177,8 @@ boolean Plugin_002(uint8_t function, struct EventStruct *event, String& string)
       #endif // if defined(ESP32)
 
       addFormCheckBox(F("Oversampling"), F("p002_oversampling"), P002_OVERSAMPLING);
+      
+      addFormCheckBox(F("Delta"), F("p002_delta"), P002_DELTA);
 
       addFormSubHeader(F("Two Point Calibration"));
 
@@ -173,6 +217,7 @@ boolean Plugin_002(uint8_t function, struct EventStruct *event, String& string)
     case PLUGIN_WEBFORM_SAVE:
     {
       P002_OVERSAMPLING = isFormItemChecked(F("p002_oversampling"));
+      P002_DELTA = isFormItemChecked(F("p002_delta"));
 
       P002_CALIBRATION_ENABLED = isFormItemChecked(F("p002_cal"));
 
@@ -212,6 +257,23 @@ boolean Plugin_002(uint8_t function, struct EventStruct *event, String& string)
       success = true;
       break;
     }
+    //  case PLUGIN_FIFTY_PER_SECOND:
+    // {
+    //   if (P002_DELTA) // do Delta
+    //   {
+    //     P002_data_struct *P002_data =
+    //       static_cast<P002_data_struct *>(getPluginTaskData(event->TaskIndex));
+
+    //     if (nullptr != P002_data) {
+    //       int currentValue;
+
+    //       P002_performRead(event, currentValue);
+    //       P002_data->addDeltaValue(currentValue);
+    //     }
+    //   }
+    //   success = true;
+    //   break;
+    // }
 
     case PLUGIN_READ:
     {
@@ -235,6 +297,15 @@ boolean Plugin_002(uint8_t function, struct EventStruct *event, String& string)
               log += F(" (");
               log += P002_data->OversamplingCount;
               log += F(" samples)");
+            }
+            if (P002_DELTA) {
+              log += F(" (samples ");
+              log += P002_data->DeltaCount;
+              log += F(" min ");
+              log += P002_data->DeltaMinVal;
+              log += F(" max ");
+              log += P002_data->DeltaMaxVal;
+              log += F(" )");
             }
             addLog(LOG_LEVEL_INFO, log);
           }
@@ -263,8 +334,16 @@ bool P002_getOutputValue(struct EventStruct *event, int& raw_value, float& res_v
 
   bool valueRead = P002_OVERSAMPLING && P002_data->getOversamplingValue(float_value, raw_value);
 
-  if (!valueRead) {
-    P002_performRead(event, raw_value);
+  if (!valueRead && P002_DELTA) {
+          int currentValue;
+    for (int i = 0 ;i<20 ;i++){
+          P002_performRead(event, currentValue);
+          P002_data->addDeltaValue(currentValue);
+          delay(1);
+    }
+    valueRead = P002_DELTA && P002_data->getDeltaValue(float_value, raw_value);
+  }
+  if (!valueRead) {    P002_performRead(event, raw_value);
     float_value = static_cast<float>(raw_value);
   }
 
