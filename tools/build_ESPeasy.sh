@@ -6,7 +6,7 @@
 # Needed packages:
 # sudo apt-get update
 # sudo apt-get upgrade
-# sudo apt install python3-minimal virtualenv build-essential zip binutils
+# sudo apt install -y software-properties-common python3-minimal virtualenv build-essential zip binutils python3.8
 # For Python 3.8:
 # sudo apt install -y software-properties-common
 # sudo add-apt-repository ppa:deadsnakes/ppa
@@ -39,9 +39,9 @@ PULL_REQ=0
 DESCRIPTION=""
 GITTAG=""
 HELP=0
-BUILD_ALL=1
+BUILD_ALL=0
 BUILD_DOCS=0
-BUILD_ESP32=0
+BUILD_ESP32=1
 BUILD_ESP82XX=0
 
 # $@ is all command line parameters passed to the script.
@@ -107,9 +107,9 @@ TMP_DIST=`echo "${SRC}/ESPEasy_collect_dist"`
 
 
 if (( $BUILD_ALL != 0 )); then
-  BUILD_DOCS=1
+  BUILD_DOCS=0
   BUILD_ESP32=1
-  BUILD_ESP82XX=1
+  BUILD_ESP82XX=0
 fi
 
 if (( $HELP != 0 )); then
@@ -220,58 +220,59 @@ fi
 
 # fetch latest version from active branch
 cd ${SRC}
-git fetch --tags
-git submodule update --init --recursive
-if [ -z $GITTAG ]; then
-  if (( $PULL_REQ != 0 )); then
-    git fetch origin +refs/pull/${PULL_REQ}/merge:
-    if [ $? -eq 0 ]; then
-      echo "Success!  git fetch origin +refs/pull/${PULL_REQ}/merge:"
-    else
-      echo "Could not fetch pull request:"
-      echo "  git fetch origin +refs/pull/${PULL_REQ}/merge:"
-      exit 1
-    fi
-    git checkout -qf FETCH_HEAD
-    if [ -z "$DESCRIPTION" ]
-    then
-      GIT_DESCRIBE=`git describe|cut -d'-' -f-3`
-      DESCRIPTION=`echo "${GIT_DESCRIBE}-PR_${PULL_REQ}"`
+# git fetch --tags
+# git submodule update --init --recursive
+# if [ -z $GITTAG ]; then
+#   if (( $PULL_REQ != 0 )); then
+#     git fetch origin +refs/pull/${PULL_REQ}/merge:
+#     if [ $? -eq 0 ]; then
+#       echo "Success!  git fetch origin +refs/pull/${PULL_REQ}/merge:"
+#     else
+#       echo "Could not fetch pull request:"
+#       echo "  git fetch origin +refs/pull/${PULL_REQ}/merge:"
+#       exit 1
+#     fi
+#     git checkout -qf FETCH_HEAD
+#     if [ -z "$DESCRIPTION" ]
+#     then
+#       GIT_DESCRIBE=`git describe|cut -d'-' -f-3`
+#       DESCRIPTION=`echo "${GIT_DESCRIBE}-PR_${PULL_REQ}"`
 
-      echo "DESCRIPTION: ${DESCRIPTION}"
-    fi
-  else 
-    # Just checkout the main branch and pull latest commits
-    git checkout ${BRANCH}
-    if [ $? -eq 0 ]; then
-      echo "Success!  git checkout ${BRANCH}"
-    else
-      echo "Could not checkout branch ${BRANCH}"
-      exit 1
-    fi
-  fi
-else
-  git checkout tags/$GITTAG -b $GITTAG
-  if [ $? -eq 0 ]; then
-    echo "Success!  git checkout tags/$GITTAG -b $GITTAG"
-  else
-    git checkout tags/$GITTAG
-    if [ $? -eq 0 ]; then
-      echo "Success!  git checkout tags/$GITTAG"
-    else
-      echo "Could not checkout Git tag:"
-      echo "  git checkout tags/$GITTAG"
-      exit 1
-    fi
-  fi
-fi
+#       echo "DESCRIPTION: ${DESCRIPTION}"
+#     fi
+#   else 
+#     # Just checkout the main branch and pull latest commits
+#     git checkout ${BRANCH}
+#     if [ $? -eq 0 ]; then
+#       echo "Success!  git checkout ${BRANCH}"
+#     else
+#       echo "Could not checkout branch ${BRANCH}"
+#       exit 1
+#     fi
+#   fi
+# else
+#   git checkout tags/$GITTAG -b $GITTAG
+#   if [ $? -eq 0 ]; then
+#     echo "Success!  git checkout tags/$GITTAG -b $GITTAG"
+#   else
+#     git checkout tags/$GITTAG
+#     if [ $? -eq 0 ]; then
+#       echo "Success!  git checkout tags/$GITTAG"
+#     else
+#       echo "Could not checkout Git tag:"
+#       echo "  git checkout tags/$GITTAG"
+#       exit 1
+#     fi
+#   fi
+# fi
 
-if [ -z "$DESCRIPTION" ]; then
-  DESCRIPTION=`git describe|cut -d'-' -f-3`
+# if [ -z "$DESCRIPTION" ]; then
+#   DESCRIPTION=`git describe|cut -d'-' -f-3`
 
-  echo "DESCRIPTION: ${DESCRIPTION}"
-fi
+#   echo "DESCRIPTION: MKA"
+# fi
 
+DESCRIPTION=`mka`
 
 if (( $BUILD_DOCS != 0 )); then
   # Build documentation
